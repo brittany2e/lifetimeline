@@ -6,26 +6,61 @@ updateTimeline = function(data) {
   var items = data;
 
   // Configuration for the Timeline
-  var options = {
-    height: '300px',
-    min: new Date(1850, 0, 1),             // lower limit of visible range
-    max: new Date(2020, 0, 1),             // upper limit of visible range
-    zoomMin: 1000 * 60 * 60 * 24 * 31 * 3, // about three months in milliseconds
-    zoomMax: 1000 * 60 * 60 * 24 * 31 * 12 * 100  // about 100 years in milliseconds
-  };
+  var options = {};
 
   // Create a Timeline
   var timeline = new vis.Timeline(container, items, options);
 };
 
 fileToDataSet = function(file) {
-   // TODO: actually read from the file
-  return new vis.DataSet([
-    {id: 1, content: 'Brittany', start: 'year=1999', end: 'year=2019'},
-    {id: 2, content: 'George', start: '2018-11-01', end: '2018-11-02'},
-    {id: 3, content: 'Henry', start: '2018-11-05', end: '2018-11-06'},
-    {id: 4, content: 'Barbara', start: '2018-11-06', end: '2018-11-19'},
-  ]);
+  var dataSet = new Array();
+  var lines = file.split('\n');
+  var lineIdx = 0
+  var line = lines[lineIdx];
+  while (lineIdx < lines.length) {
+    
+    if(line[0] != "0" || !line.includes("INDI")) {
+      lineIdx++;
+      line = lines[lineIdx];
+      continue;
+    }
+    
+    var id = lineIdx;
+    var name = null;
+    var birth = null;
+    var death = null
+    lineIdx++;
+    line = lines[lineIdx];
+    // keep going until end of file or next INDI record
+    while (lineIdx < lines.length && line[0] != "0") {
+      if (line.includes("1 NAME")) {
+        name = line.substring(7);
+      }
+      else if (line.includes("1 BIRT")) {
+        lineIdx++;
+        line = lines[lineIdx];
+        birth = new Date(line.substring(7));
+      }
+      else if (line.includes("1 DEAT")) {
+        lineIdx++;
+        line = lines[lineIdx];
+        death = new Date(line.substring(7));
+      }
+      lineIdx++;
+      line = lines[lineIdx];
+    }
+
+    if (birth != null && death != null) {
+      var data = {
+        id: id,
+        content: name,
+        start: birth.toISOString(),
+        end: death.toISOString()
+      };
+      dataSet.push(data);
+    }
+  }
+  return new vis.DataSet(dataSet);
 };
 
 if (Meteor.isClient) {
@@ -37,8 +72,8 @@ if (Meteor.isClient) {
       if (file) {
         var reader = new FileReader();
         
-        reader.onload = function(onLoadEvent) {
-          var fileData = fileToDataSet(file);
+        reader.onload = function() {
+          var fileData = fileToDataSet(this.result);
           updateTimeline(fileData);
         };
 
